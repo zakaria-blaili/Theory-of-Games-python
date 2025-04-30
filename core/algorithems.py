@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Set
 from .modeles import Jeu
 from itertools import product
 
@@ -9,73 +9,139 @@ class AnalyseurJeu:
         
     def strategies_dominantes(self, id_joueur: int) -> Dict[str, List[int]]:
         """
-        Returns dominant strategies categorized properly.
-        Returns: {
-            'strict': [indices of strictly dominant strategies],
-            'weak': [indices of weakly (but not strictly) dominant strategies]
-        }
+        Retourne les stratégies strictement et faiblement dominantes.
         """
-        gains = self.jeu.gains[id_joueur]
-        n_strategies = len(self.jeu.joueurs[id_joueur-1].strategies)
-        result = {'strict': set(), 'weak': set()}
+        strict = self._strategies_dominantes_type(id_joueur, faiblement=False)
+        weak = self._strategies_dominantes_type(id_joueur, faiblement=True)
+        return {
+            "strict": strict,
+            "weak": weak
+        }
 
-        # Compare all strategy pairs
+    def _strategies_dominantes_type(self, id_joueur: int, faiblement: bool) -> List[int]:
+        player_idx = id_joueur - 1
+        gains = self.jeu.gains[id_joueur]
+        n_strategies = len(self.jeu.joueurs[player_idx].strategies)
+        dominantes = []
+
         for strat in range(n_strategies):
-            strictly_dominates_any = False
-            weakly_dominates_any = False
-            
+            is_dominated = False
             for other in range(n_strategies):
                 if strat == other:
                     continue
-                    
-                if id_joueur == 1:
-                    diff = gains[strat, :] - gains[other, :]
+
+                # Build mask for all other players’ strategies
+                others = [list(range(len(j.strategies))) for j in self.jeu.joueurs if j.id != id_joueur]
+                for combi in product(*others):
+                    if id_joueur == 1:
+                        strat_payoff = gains[(strat,) + combi]
+                        other_payoff = gains[(other,) + combi]
+                    else:
+                        strat_payoff = gains[combi[:id_joueur-1] + (strat,) + combi[id_joueur-1:]]
+                        other_payoff = gains[combi[:id_joueur-1] + (other,) + combi[id_joueur-1:]]
+
+                    if not faiblement and strat_payoff >= other_payoff:
+                        break
+                    if faiblement and strat_payoff > other_payoff:
+                        break
                 else:
-                    diff = gains[:, strat] - gains[:, other]
-                
-                # Check strict dominance
-                if np.all(diff > 0):
-                    strictly_dominates_any = True
-                    break  # No need to check others if strictly dominates one
-                    
-                # Check weak dominance if not already found strict
-                if np.all(diff >= 0) and np.any(diff > 0):
-                    weakly_dominates_any = True
-            
-            # Categorize the strategy
-            if strictly_dominates_any:
-                result['strict'].add(strat)
-            elif weakly_dominates_any:
-                result['weak'].add(strat)
-        
-        # Convert sets to sorted lists
-        return {k: sorted(v) for k, v in result.items()}
+                    # All comparisons passed (domination)
+                    dominantes.append(strat)
+
+        return dominantes
+
     
-    def elimination_strategies_dominantes(self, strict=True) -> List[Tuple[int]]:
+    def est_strictement_dominee(self, id_joueur: int, strat: int, strategies_actives: Dict[int, List[int]]) -> bool:
+        """
+        Vérifie si une stratégie est strictement dominée.
+        """
+        gains = self.jeu.gains[id_joueur]
+        player_idx = id_joueur - 1
+        
+        for other in strategies_actives[id_joueur]:
+            if other == strat:
+                continue
+                
+            if id_joueur == 1:
+                # For player 1, compare rows
+                opponent_id = 2
+                mask = [i in strategies_actives[opponent_id] for i in range(gains.shape[1])]
+                diff = gains[strat, :][mask] - gains[other, :][mask]
+            else:
+                # For player 2, compare columns
+                opponent_id = 1
+                mask = [i in strategies_actives[opponent_id] for i in range(gains.shape[0])]
+                diff = gains[:, strat][mask] - gains[:, other][mask]
+            
+            if np.all(diff < 0):
+                return True
+                
+        return False
+    
+    def elimination_strategies_dominantes(self, strict: bool = True) -> List[Tuple[int, ...]]:
         """
         Élimination itérée des stratégies dominées.
-        Gère les jeux avec des nombres de stratégies différents.
         """
+        # Initialize active strategies (convert to 1-based IDs)
         strategies_actives = {
-            j.id: list(range(len(j.strategies))) 
-            for j in self.jeu.joueurs
+            joueur.id: list(range(len(joueur.strategies)))
+            for joueur in self.jeu.joueurs
         }
         
-        while True:
-            elimine = False
+        changed = True
+        while changed:
+            changed = False
             
             for joueur in self.jeu.joueurs:
-                dominantes = self.strategies_dominantes(joueur.id, faiblement=not strict)
-                if dominantes and len(strategies_actives[joueur.id]) > 1:
-                    strategies_actives[joueur.id] = dominantes
-                    elimine = True
-            
-            if not elimine:
-                break
+                to_remove = []
+                for strat in strategies_actives[joueur.id]:
+                    if self.est_strictement_dominee(joueur.id, strat, strategies_actives):
+                        to_remove.append(strat)
+                        changed = True
                 
-        return list(product(*[strategies_actives[j.id] for j in self.jeu.joueurs]))
+                if to_remove:
+                    strategies_actives[joueur.id] = [
+                        s for s in strategies_actives[joueur.id] 
+                        if s not in to_remove
+                    ]
+        
+        # Generate remaining strategy profiles
+        return list(product(*[
+            strategies_actives[joueur.id] 
+            for joueur in sorted(self.jeu.joueurs, key=lambda x: x.id)
+        ]))
     
-    def equilibre_nash(self):
+    def equilibre_iteratif_dominance_stricte(self) -> Tuple[List[Tuple[int]], List[str]]:
+        """
+        Retourne les profils restants et le chemin d'élimination (sous forme de texte lisible).
+        """
+        joueurs = self.jeu.joueurs
+        gains = self.jeu.gains
+        strategies_actives = {j.id: set(range(len(j.strategies))) for j in joueurs}
+        
+        chemin_elimination = []
+        modification = True
+        
+        while modification:
+            modification = False
+            for joueur in joueurs:
+                id_j = joueur.id
+                actives = list(strategies_actives[id_j])
+                for strat in actives:
+                    if self.est_strictement_dominee(id_j, strat, strategies_actives):
+                        strategies_actives[id_j].remove(strat)
+                        chemin_elimination.append(f"Joueur {id_j} : stratégie éliminée -> {joueur.strategies[strat]}")
+                        modification = True
+                        break  # recommencer l'itération si on a supprimé une stratégie
+                if modification:
+                    break
+
+        # Générer tous les profils restants
+        restants = list(product(*[list(strategies_actives[j.id]) for j in joueurs]))
+        return restants, chemin_elimination
+
+    
+    def equilibre_nash(self) -> List[Tuple[int, ...]]:
         """N-player Nash equilibrium"""
         shapes = [len(j.strategies) for j in self.jeu.joueurs]
         equilibres = []
@@ -99,14 +165,9 @@ class AnalyseurJeu:
         return equilibres
     
     def optimum_pareto(self) -> List[Tuple[int, ...]]:
-        """
-        Optimum de Pareto pour des jeux avec stratégies différentes.
-        """
-        pareto_optima = []
+        """Optimum de Pareto"""
         shapes = [len(j.strategies) for j in self.jeu.joueurs]
-        
-        # Générer tous les profils possibles
-        from itertools import product
+        pareto_optima = []
         tous_profils = list(product(*[range(s) for s in shapes]))
         
         for profil in tous_profils:
@@ -119,11 +180,8 @@ class AnalyseurJeu:
                     
                 gains_autre = [self.jeu.gains[j.id][autre] for j in self.jeu.joueurs]
                 
-                # Vérifier domination Pareto
-                tous_meilleurs_ou_egaux = all(g >= p for g, p in zip(gains_autre, gains_profil))
-                au_moins_un_meilleur = any(g > p for g, p in zip(gains_autre, gains_profil))
-                
-                if tous_meilleurs_ou_egaux and au_moins_un_meilleur:
+                if all(g >= p for g, p in zip(gains_autre, gains_profil)) and \
+                   any(g > p for g, p in zip(gains_autre, gains_profil)):
                     est_pareto = False
                     break
             
@@ -133,12 +191,10 @@ class AnalyseurJeu:
         return pareto_optima
     
     def niveau_securite(self, id_joueur: int) -> Tuple[float, int]:
-        """
-        Niveau de sécurité pour un joueur avec gestion des dimensions variables.
-        """
+        """Niveau de sécurité pour un joueur"""
         gains = self.jeu.gains[id_joueur]
-        joueur_index = id_joueur - 1
-        n_strategies = len(self.jeu.joueurs[joueur_index].strategies)
+        player_idx = id_joueur - 1
+        n_strategies = len(self.jeu.joueurs[player_idx].strategies)
         
         if id_joueur == 1:
             min_gains = np.min(gains, axis=1)  # Minimum par ligne
@@ -151,22 +207,20 @@ class AnalyseurJeu:
         return (max_min, meilleure_strat)
     
     def meilleure_reponse(self, id_joueur: int, strategies_autres: Tuple[int, ...]) -> List[int]:
-        """
-        Trouve les meilleures réponses pour un joueur donné une stratégie des autres.
-        """
+        """Meilleure réponse pour un joueur"""
         gains = self.jeu.gains[id_joueur]
-        joueur_index = id_joueur - 1
-        n_strategies = len(self.jeu.joueurs[joueur_index].strategies)
+        player_idx = id_joueur - 1
+        n_strategies = len(self.jeu.joueurs[player_idx].strategies)
         
-        # Reconstruire l'index complet
+        # Rebuild complete index
         index = list(strategies_autres)
-        index.insert(joueur_index, 0)  # Valeur temporaire
+        index.insert(player_idx, 0)  # Temporary value
         
         meilleures = []
         max_gain = -np.inf
         
         for strat in range(n_strategies):
-            index[joueur_index] = strat
+            index[player_idx] = strat
             gain = gains[tuple(index)]
             
             if gain > max_gain:

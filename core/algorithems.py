@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from .modeles import Jeu
+from itertools import product
 
 class AnalyseurJeu:
     def __init__(self, jeu: Jeu):
@@ -72,46 +73,29 @@ class AnalyseurJeu:
             if not elimine:
                 break
                 
-        # Générer les profils restants
-        from itertools import product
         return list(product(*[strategies_actives[j.id] for j in self.jeu.joueurs]))
     
-    def equilibre_nash(self) -> List[Tuple[int, ...]]:
-        """
-        Équilibre de Nash pour des jeux à N joueurs avec stratégies différentes.
-        """
-        equilibres = []
+    def equilibre_nash(self):
+        """N-player Nash equilibrium"""
         shapes = [len(j.strategies) for j in self.jeu.joueurs]
+        equilibres = []
         
-        # Générer tous les profils possibles
-        from itertools import product
-        tous_profils = product(*[range(s) for s in shapes])
-        
-        for profil in tous_profils:
-            est_equilibre = True
-            
+        for profil in product(*[range(s) for s in shapes]):
+            is_equilibrium = True
             for i, joueur in enumerate(self.jeu.joueurs):
-                gain_actuel = self.jeu.gains[joueur.id][profil]
-                
-                # Vérifier toutes les déviations possibles
-                for deviation in range(shapes[i]):
-                    if deviation == profil[i]:
+                current_payoff = self.jeu.gains[joueur.id][profil]
+                for dev in range(shapes[i]):
+                    if dev == profil[i]:
                         continue
-                        
-                    nouveau_profil = list(profil)
-                    nouveau_profil[i] = deviation
-                    nouveau_profil = tuple(nouveau_profil)
-                    
-                    if self.jeu.gains[joueur.id][nouveau_profil] > gain_actuel:
-                        est_equilibre = False
+                    new_profil = list(profil)
+                    new_profil[i] = dev
+                    if self.jeu.gains[joueur.id][tuple(new_profil)] > current_payoff:
+                        is_equilibrium = False
                         break
-                
-                if not est_equilibre:
+                if not is_equilibrium:
                     break
-            
-            if est_equilibre:
+            if is_equilibrium:
                 equilibres.append(profil)
-        
         return equilibres
     
     def optimum_pareto(self) -> List[Tuple[int, ...]]:

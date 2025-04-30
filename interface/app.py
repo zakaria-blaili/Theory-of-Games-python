@@ -15,49 +15,69 @@ from core.utils import charger_jeu_classique, normaliser_gains
 def creer_jeu_personnalise():
     st.header("🎮 Configuration du Jeu Personnalisé")
     
-    num_players = 2  # On garde 2 joueurs pour simplifier
+    # Nombre de joueurs (de 2 à 5)
+    num_players = st.selectbox(
+        "Nombre de joueurs",
+        [2, 3, 4, 5],
+        index=0
+    )
     
-    # Configuration des stratégies
+    # Configuration des stratégies pour chaque joueur
     strategies = {}
     for i in range(1, num_players + 1):
-        strat_count = st.number_input(
-            f"Nombre de stratégies pour le Joueur {i}",
-            min_value=2,
-            max_value=5,
-            value=2,
-            key=f"strat_joueur_{i}"
-        )
-        strategies[i] = [f"Stratégie {chr(65+j)}" for j in range(strat_count)]
+        with st.expander(f"Joueur {i} - Configuration", expanded=True):
+            strat_count = st.number_input(
+                f"Nombre de stratégies pour le Joueur {i}",
+                min_value=2,
+                max_value=5,
+                value=2,
+                key=f"strat_joueur_{i}"
+            )
+            # Let user name each strategy
+            strategies[i] = [
+                st.text_input(
+                    f"Nom stratégie {j+1} (Joueur {i})",
+                    value=f"S{j+1}",
+                    key=f"strat_name_{i}_{j}"
+                )
+                for j in range(strat_count)
+            ]
     
-    # Configuration des gains
+    # Configuration des gains (using dynamic ND-arrays)
     st.subheader("Matrices des Gains")
-    p1_matrix = np.zeros((len(strategies[1]), len(strategies[2])))
-    p2_matrix = np.zeros((len(strategies[1]), len(strategies[2])))
+    gains = {}
     
-    cols = st.columns(2)
-    with cols[0]:
-        st.write("**Joueur 1**")
-        for i in range(len(strategies[1])):
-            for j in range(len(strategies[2])):
-                p1_matrix[i,j] = st.number_input(
-                    f"J1 gain quand {strategies[1][i]}/{strategies[2][j]}",
-                    value=0,
-                    key=f"p1_{i}_{j}"
-                )
+    # Create all possible strategy combinations
+    from itertools import product
+    all_strat_combinations = list(product(*[range(len(s)) for s in strategies.values()]))
     
-    with cols[1]:
-        st.write("**Joueur 2**")
-        for i in range(len(strategies[1])):
-            for j in range(len(strategies[2])):
-                p2_matrix[i,j] = st.number_input(
-                    f"J2 gain quand {strategies[1][i]}/{strategies[2][j]}",
-                    value=0,
-                    key=f"p2_{i}_{j}"
-                )
+    for player_id in range(1, num_players + 1):
+        st.markdown(f"**Joueur {player_id}**")
+        
+        # Initialize ND-array for this player's gains
+        shape = tuple(len(s) for s in strategies.values())
+        player_gains = np.zeros(shape)
+        
+        # For each strategy combination
+        # In creer_jeu_personnalise() function:
+        for combo in all_strat_combinations:
+            # Create readable label - FIXED MISSING PARENTHESIS
+            combo_label = " / ".join(
+                f"{strategies[p+1][s]}" 
+                for p, s in enumerate(combo)
+            )  # This parenthesis was missing
+            
+            # Input for this specific combination
+            player_gains[combo] = st.number_input(
+                f"Gain J{player_id} quand {combo_label}",
+                value=0,
+                key=f"gain_{player_id}_{'_'.join(map(str, combo))}"
+            )
+        
+        gains[player_id] = player_gains
     
-    # Création du jeu
-    joueurs = [Joueur(1, strategies[1]), Joueur(2, strategies[2])]
-    gains = {1: p1_matrix, 2: p2_matrix}
+    # Create players and game
+    joueurs = [Joueur(i, strategies[i]) for i in range(1, num_players + 1)]
     
     try:
         return Jeu(joueurs, gains)

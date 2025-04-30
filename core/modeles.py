@@ -16,18 +16,13 @@ class Jeu:
         self.gains = gains
         self._valider_matrice_gains()  # Ajout de la validation
         
+   
     def _valider_matrice_gains(self):
-        """Vérifie que les matrices ont les bonnes dimensions"""
-        expected_shape = [len(j.strategies) for j in self.joueurs]
-        
+        expected_shape = tuple(len(j.strategies) for j in self.joueurs)
         for j in self.joueurs:
-            mat = self.gains[j.id]
-            if mat.shape != tuple(expected_shape):
-                raise ValueError(
-                    f"Dimensions incorrectes pour le joueur {j.id}. "
-                    f"Attendu: {expected_shape}, Reçu: {mat.shape}"
-                )
-    
+            if self.gains[j.id].shape != expected_shape:
+                raise ValueError(f"Dimensions incorrectes pour le joueur {j.id}")
+                
     def get_strategie_name(self, id_joueur: int, index: int) -> str:
         """Retourne le nom d'une stratégie"""
         for j in self.joueurs:

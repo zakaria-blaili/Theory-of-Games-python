@@ -15,8 +15,7 @@ from core.utils import charger_jeu_classique, normaliser_gains
 def creer_jeu_personnalise():
     st.header("🎮 Configuration du Jeu Personnalisé")
     
-    # Nombre de joueurs
-    num_players = st.selectbox("Nombre de joueurs", [2], index=0)
+    num_players = 2  # On garde 2 joueurs pour simplifier
     
     # Configuration des stratégies
     strategies = {}
@@ -32,43 +31,38 @@ def creer_jeu_personnalise():
     
     # Configuration des gains
     st.subheader("Matrices des Gains")
+    p1_matrix = np.zeros((len(strategies[1]), len(strategies[2])))
+    p2_matrix = np.zeros((len(strategies[1]), len(strategies[2])))
     
-    # Pour un jeu à 2 joueurs
-    if num_players == 2:
-        p1_matrix = np.zeros((len(strategies[1]), len(strategies[2])))
-        p2_matrix = np.zeros((len(strategies[1]), len(strategies[2])))
-        
-        cols = st.columns(2)
-        with cols[0]:
-            st.write("**Joueur 1**")
-            for i in range(len(strategies[1])):
-                for j in range(len(strategies[2])):
-                    p1_matrix[i,j] = st.number_input(
-                        f"J1 gain quand {strategies[1][i]}/{strategies[2][j]}",
-                        value=0,
-                        key=f"p1_{i}_{j}"
-                    )
-        
-        with cols[1]:
-            st.write("**Joueur 2**")
-            for i in range(len(strategies[1])):
-                for j in range(len(strategies[2])):
-                    p2_matrix[i,j] = st.number_input(
-                        f"J2 gain quand {strategies[1][i]}/{strategies[2][j]}",
-                        value=0,
-                        key=f"p2_{i}_{j}"
-                    )
-        
-        # Création des joueurs et du jeu
-        joueurs = [
-            Joueur(1, strategies[1]),
-            Joueur(2, strategies[2])
-        ]
-        gains = {1: p1_matrix, 2: p2_matrix}
-        
+    cols = st.columns(2)
+    with cols[0]:
+        st.write("**Joueur 1**")
+        for i in range(len(strategies[1])):
+            for j in range(len(strategies[2])):
+                p1_matrix[i,j] = st.number_input(
+                    f"J1 gain quand {strategies[1][i]}/{strategies[2][j]}",
+                    value=0,
+                    key=f"p1_{i}_{j}"
+                )
+    
+    with cols[1]:
+        st.write("**Joueur 2**")
+        for i in range(len(strategies[1])):
+            for j in range(len(strategies[2])):
+                p2_matrix[i,j] = st.number_input(
+                    f"J2 gain quand {strategies[1][i]}/{strategies[2][j]}",
+                    value=0,
+                    key=f"p2_{i}_{j}"
+                )
+    
+    # Création du jeu
+    joueurs = [Joueur(1, strategies[1]), Joueur(2, strategies[2])]
+    gains = {1: p1_matrix, 2: p2_matrix}
+    
+    try:
         return Jeu(joueurs, gains)
-    else:
-        st.warning("Seuls les jeux à 2 joueurs sont supportés pour le moment")
+    except ValueError as e:
+        st.error(f"Erreur de configuration: {str(e)}")
         return None
 
 # Configuration de la page

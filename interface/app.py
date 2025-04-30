@@ -1,25 +1,76 @@
 import streamlit as st
 import sys
 from pathlib import Path
+import numpy as np
 
 # Set absolute path to project root
 current_file = Path(__file__).resolve()
 project_root = current_file.parent.parent
 sys.path.insert(0, str(project_root))
 
-# Debug output
-st.write(f"Looking for modules in: {project_root}/core")
-st.write(f"Files in core: {[f.name for f in (project_root/'core').iterdir() if f.is_file()]}")
+from core.modeles import Jeu, Joueur
+from core.algorithems import AnalyseurJeu
+from core.utils import charger_jeu_classique, normaliser_gains
 
-try:
-    from core.modeles import Jeu, Joueur
-    from core.algorithems import AnalyseurJeu
-    from core.utils import charger_jeu_classique, normaliser_gains
-    st.success("All imports successful!")
-except ImportError as e:
-    st.error(f"Import error details: {repr(e)}")
-    raise
-# Rest of your app code...
+def creer_jeu_personnalise():
+    st.header("🎮 Configuration du Jeu Personnalisé")
+    
+    # Nombre de joueurs
+    num_players = st.selectbox("Nombre de joueurs", [2], index=0)
+    
+    # Configuration des stratégies
+    strategies = {}
+    for i in range(1, num_players + 1):
+        strat_count = st.number_input(
+            f"Nombre de stratégies pour le Joueur {i}",
+            min_value=2,
+            max_value=5,
+            value=2,
+            key=f"strat_joueur_{i}"
+        )
+        strategies[i] = [f"Stratégie {chr(65+j)}" for j in range(strat_count)]
+    
+    # Configuration des gains
+    st.subheader("Matrices des Gains")
+    
+    # Pour un jeu à 2 joueurs
+    if num_players == 2:
+        p1_matrix = np.zeros((len(strategies[1]), len(strategies[2])))
+        p2_matrix = np.zeros((len(strategies[1]), len(strategies[2])))
+        
+        cols = st.columns(2)
+        with cols[0]:
+            st.write("**Joueur 1**")
+            for i in range(len(strategies[1])):
+                for j in range(len(strategies[2])):
+                    p1_matrix[i,j] = st.number_input(
+                        f"J1 gain quand {strategies[1][i]}/{strategies[2][j]}",
+                        value=0,
+                        key=f"p1_{i}_{j}"
+                    )
+        
+        with cols[1]:
+            st.write("**Joueur 2**")
+            for i in range(len(strategies[1])):
+                for j in range(len(strategies[2])):
+                    p2_matrix[i,j] = st.number_input(
+                        f"J2 gain quand {strategies[1][i]}/{strategies[2][j]}",
+                        value=0,
+                        key=f"p2_{i}_{j}"
+                    )
+        
+        # Création des joueurs et du jeu
+        joueurs = [
+            Joueur(1, strategies[1]),
+            Joueur(2, strategies[2])
+        ]
+        gains = {1: p1_matrix, 2: p2_matrix}
+        
+        return Jeu(joueurs, gains)
+    else:
+        st.warning("Seuls les jeux à 2 joueurs sont supportés pour le moment")
+        return None
+
 # Configuration de la page
 st.title("📊 Analyse des Jeux Stratégiques")
 st.markdown("""
@@ -34,9 +85,6 @@ with st.sidebar:
         ["dilemme_prisonnier", "bataille_sexes", "personnalise"]
     )
     
-    if choix_jeu == "personnalise":
-        st.warning("La configuration personnalisée n'est pas encore implémentée")
-    
     st.markdown("---")
     st.header("Options d'Analyse")
     analyse_nash = st.checkbox("Équilibre de Nash", True)
@@ -46,8 +94,12 @@ with st.sidebar:
 
 # Chargement du jeu
 try:
-    if choix_jeu != "personnalise":
+    if choix_jeu == "personnalise":
+        jeu = creer_jeu_personnalise()
+    else:
         jeu = charger_jeu_classique(choix_jeu)
+    
+    if jeu:
         analyseur = AnalyseurJeu(jeu)
         
         # Affichage des matrices de gains

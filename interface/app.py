@@ -72,9 +72,10 @@ def creer_jeu_personnalise():
         return None
 
 # Configuration de la page
+st.set_page_config(page_title="Analyse des Jeux Stratégiques", page_icon="📊", layout="wide")
 st.title("📊 Analyse des Jeux Stratégiques")
 st.markdown("""
-Cette application permet d'analyser les jeux stratégiques à 2 joueurs ou plus en utilisant différents concepts de théorie des jeux.
+Cette application permet d'analyser les jeux stratégiques à 2 joueurs en utilisant différents concepts de théorie des jeux.
 """)
 
 # Sidebar pour la configuration
@@ -82,7 +83,8 @@ with st.sidebar:
     st.header("Configuration du Jeu")
     choix_jeu = st.selectbox(
         "Choisir un jeu",
-        ["dilemme_prisonnier", "bataille_sexes", "personnalise"]
+        ["dilemme_prisonnier", "bataille_sexes", "personnalise"],
+        index=0
     )
     
     st.markdown("---")
@@ -108,39 +110,57 @@ try:
         
         with col1:
             st.markdown(f"**Joueur 1**")
-            st.dataframe(jeu.gains[1])
+            # Convert to DataFrame for better display
+            import pandas as pd
+            df1 = pd.DataFrame(
+                jeu.gains[1],
+                index=[jeu.get_strategie_name(1, i) for i in range(len(jeu.joueurs[0].strategies))],
+                columns=[jeu.get_strategie_name(2, j) for j in range(len(jeu.joueurs[1].strategies))]
+            )
+            st.dataframe(df1.style.format("{:.1f}"))
         
         with col2:
             st.markdown(f"**Joueur 2**")
-            st.dataframe(jeu.gains[2])
+            df2 = pd.DataFrame(
+                jeu.gains[2],
+                index=[jeu.get_strategie_name(1, i) for i in range(len(jeu.joueurs[0].strategies))],
+                columns=[jeu.get_strategie_name(2, j) for j in range(len(jeu.joueurs[1].strategies))]
+            )
+            st.dataframe(df2.style.format("{:.1f}"))
         
         # Affichage des résultats
         st.subheader("Résultats de l'Analyse")
         
         if analyse_nash:
-            with st.expander("Équilibre de Nash"):
+            with st.expander("Équilibre de Nash", expanded=True):
                 equilibres = analyseur.equilibre_nash()
                 if equilibres:
                     st.write("Équilibres trouvés:")
                     for eq in equilibres:
                         noms = [jeu.get_strategie_name(i+1, s) for i, s in enumerate(eq)]
-                        st.write(f"- Profil {eq}: {', '.join(noms)}")
+                        st.write(f"- Profil stratégique: {', '.join(noms)}")
+                        st.write(f"  Gains correspondants:")
+                        for j, player_id in enumerate(jeu.gains.keys()):
+                            st.write(f"  Joueur {player_id}: {jeu.gains[player_id][eq[0], eq[1]]}")
                 else:
                     st.warning("Aucun équilibre de Nash en stratégies pures trouvé")
         
         if analyse_pareto:
-            with st.expander("Optimum de Pareto"):
+            with st.expander("Optimum de Pareto", expanded=True):
                 pareto_optima = analyseur.optimum_pareto()
                 if pareto_optima:
                     st.write("Optima de Pareto trouvés:")
                     for opt in pareto_optima:
                         noms = [jeu.get_strategie_name(i+1, s) for i, s in enumerate(opt)]
-                        st.write(f"- Profil {opt}: {', '.join(noms)}")
+                        st.write(f"- Profil stratégique: {', '.join(noms)}")
+                        st.write(f"  Gains correspondants:")
+                        for j, player_id in enumerate(jeu.gains.keys()):
+                            st.write(f"  Joueur {player_id}: {jeu.gains[player_id][opt[0], opt[1]]}")
                 else:
                     st.warning("Aucun optimum de Pareto trouvé")
         
         if analyse_securite:
-            with st.expander("Niveaux de Sécurité"):
+            with st.expander("Niveaux de Sécurité", expanded=True):
                 for j in jeu.joueurs:
                     valeur, strat = analyseur.niveau_securite(j.id)
                     st.write(f"**Joueur {j.id}**:")
@@ -149,7 +169,7 @@ try:
                     st.write("---")
         
         if analyse_dominance:
-            with st.expander("Stratégies Dominantes"):
+            with st.expander("Stratégies Dominantes", expanded=True):
                 for j in jeu.joueurs:
                     st.write(f"**Joueur {j.id}**:")
                     
@@ -186,3 +206,4 @@ try:
     
 except Exception as e:
     st.error(f"Une erreur est survenue: {str(e)}")
+    st.error("Veuillez vérifier que tous les modules nécessaires sont correctement installés et que les chemins d'accès sont valides.")

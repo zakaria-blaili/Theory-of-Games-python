@@ -7,151 +7,153 @@ class AnalyseurJeu:
         self.jeu = jeu
         
     def strategies_dominantes(self, id_joueur: int, faiblement=False) -> List[int]:
-        """
-        Identifie les stratégies dominantes pour un joueur
-        faiblement: Si True, cherche les stratégies faiblement dominantes
-        Retourne la liste des indices de stratégies dominantes
-        """
-        gains = self.jeu.gains[id_joueur]
-        n_strategies = gains.shape[0]
+        """Version finale corrigée avec vérification précise de la dominance"""
+        if id_joueur == 1:
+            gains = self.jeu.gains[1]  # Matrice [strat_j1, strat_j2]
+            n_strategies = gains.shape[0]
+            compare_axis = 1  # On compare les lignes entre elles
+        else:
+            gains = self.jeu.gains[2]  # Matrice [strat_j1, strat_j2]
+            n_strategies = gains.shape[1]
+            compare_axis = 0  # On compare les colonnes entre elles
+        
         dominantes = []
         
-        for i in range(n_strategies):
-            dominante = True
-            for j in range(n_strategies):
-                if i == j:
+        for strat in range(n_strategies):
+            est_dominante = True
+            strictement_superieure = True
+            
+            # Extraire les gains pour cette stratégie
+            if id_joueur == 1:
+                gains_strat = gains[strat, :]
+            else:
+                gains_strat = gains[:, strat]
+            
+            for autre_strat in range(n_strategies):
+                if strat == autre_strat:
                     continue
-                
-                if faiblement:
-                    condition = np.all(gains[i] >= gains[j]) and np.any(gains[i] > gains[j])
+                    
+                # Extraire les gains pour l'autre stratégie
+                if id_joueur == 1:
+                    gains_autre = gains[autre_strat, :]
                 else:
-                    condition = np.all(gains[i] > gains[j])
+                    gains_autre = gains[:, autre_strat]
                 
-                if not condition:
-                    dominante = False
+                # Vérifier la dominance
+                if not np.all(gains_strat >= gains_autre):
+                    est_dominante = False
                     break
                     
-            if dominante:
-                dominantes.append(i)
-                
+                if not np.all(gains_strat > gains_autre):
+                    strictement_superieure = False
+            
+            if est_dominante:
+                if not faiblement and strictement_superieure:
+                    dominantes.append(strat)
+                elif faiblement:
+                    dominantes.append(strat)
+        
         return dominantes
     
     def elimination_strategies_dominantes(self, strict=True) -> List[Tuple[int]]:
         """
-        Effectue l'élimination itérée des stratégies dominées
-        strict: Si True, élimine les stratégies strictement dominées
-        Retourne les profils de stratégies survivantes
+        Élimination itérée des stratégies dominées (corrigé)
         """
-        joueurs_actifs = self.jeu.joueurs.copy()
-        strategies_actives = {j.id: list(range(j.n_strategies)) for j in joueurs_actifs}
+        strategies_actives = {
+            1: list(range(len(self.jeu.joueurs[0].strategies))),
+            2: list(range(len(self.jeu.joueurs[1].strategies)))
+        }
         
         while True:
             elimine = False
             
-            for j in joueurs_actifs:
-                dominantes = self.strategies_dominantes(j.id, faiblement=not strict)
-                if dominantes:
-                    strategies_actives[j.id] = dominantes
+            for joueur in [1, 2]:
+                dominantes = self.strategies_dominantes(joueur, faiblement=not strict)
+                if dominantes and len(strategies_actives[joueur]) > 1:
+                    strategies_actives[joueur] = dominantes
                     elimine = True
             
             if not elimine:
                 break
                 
-        # Générer tous les profils possibles avec les stratégies restantes
+        # Générer les profils restants
         from itertools import product
-        profils = list(product(*[strategies_actives[j.id] for j in joueurs_actifs]))
-        return profils
+        return list(product(strategies_actives[1], strategies_actives[2]))
     
-    def equilibre_nash(self) -> List[Tuple[int]]:
+    def equilibre_nash(self) -> List[Tuple[int, int]]:
         """
-        Trouve tous les équilibres de Nash en stratégies pures
-        Retourne une liste de tuples représentant les profils de stratégies
+        Équilibre de Nash (corrigé)
         """
         equilibres = []
-        shapes = [j.n_strategies for j in self.jeu.joueurs]
+        n_strat_j1 = len(self.jeu.joueurs[0].strategies)
+        n_strat_j2 = len(self.jeu.joueurs[1].strategies)
         
-        # Générer tous les profils possibles
-        from itertools import product
-        for profil in product(*[range(s) for s in shapes]):
-            est_equilibre = True
-            
-            for j in self.jeu.joueurs:
-                gain_courant = self._obtenir_gain(j.id, profil)
-                
-                # Tester toutes les déviations possibles
-                for s in range(shapes[j.id-1]):
-                    if s == profil[j.id-1]:
-                        continue
-                    
-                    nouveau_profil = list(profil)
-                    nouveau_profil[j.id-1] = s
-                    nouveau_gain = self._obtenir_gain(j.id, nouveau_profil)
-                    
-                    if nouveau_gain > gain_courant:
-                        est_equilibre = False
+        for i in range(n_strat_j1):
+            for j in range(n_strat_j2):
+                # Vérification pour le joueur 1
+                gain_j1 = self.jeu.gains[1][i, j]
+                meilleur_j1 = True
+                for k in range(n_strat_j1):
+                    if self.jeu.gains[1][k, j] > gain_j1:
+                        meilleur_j1 = False
                         break
                 
-                if not est_equilibre:
-                    break
-            
-            if est_equilibre:
-                equilibres.append(profil)
+                # Vérification pour le joueur 2
+                gain_j2 = self.jeu.gains[2][i, j]
+                meilleur_j2 = True
+                for l in range(n_strat_j2):
+                    if self.jeu.gains[2][i, l] > gain_j2:
+                        meilleur_j2 = False
+                        break
                 
+                if meilleur_j1 and meilleur_j2:
+                    equilibres.append((i, j))
+        
         return equilibres
     
-    def _obtenir_gain(self, id_joueur: int, profil: Tuple[int]) -> float:
+    def optimum_pareto(self) -> List[Tuple[int, int]]:
         """
-        Helper function pour extraire le gain d'un joueur donné un profil de stratégies
+        Optimum de Pareto (corrigé)
         """
-        return self.jeu.gains[id_joueur][tuple([p-1 if i+1 == id_joueur else p for i, p in enumerate(profil)])]
-    
-    def optimum_pareto(self) -> List[Tuple[int]]:
-        """
-        Identifie les optima de Pareto
-        Retourne la liste des profils Pareto-optimaux
-        """
-        shapes = [j.n_strategies for j in self.jeu.joueurs]
-        from itertools import product
-        tous_profils = list(product(*[range(s) for s in shapes]))
-        
         pareto_optima = []
+        n_strat_j1 = len(self.jeu.joueurs[0].strategies)
+        n_strat_j2 = len(self.jeu.joueurs[1].strategies)
         
-        for profil in tous_profils:
-            pareto_optimal = True
-            gains_profil = [self._obtenir_gain(j.id, profil) for j in self.jeu.joueurs]
+        # Générer tous les profils possibles
+        profils = [(i, j) for i in range(n_strat_j1) for j in range(n_strat_j2)]
+        
+        for profil in profils:
+            est_pareto = True
+            gain_j1 = self.jeu.gains[1][profil]
+            gain_j2 = self.jeu.gains[2][profil]
             
-            for autre_profil in tous_profils:
-                if autre_profil == profil:
-                    continue
-                    
-                gains_autre = [self._obtenir_gain(j.id, autre_profil) for j in self.jeu.joueurs]
+            for autre in profils:
+                autre_j1 = self.jeu.gains[1][autre]
+                autre_j2 = self.jeu.gains[2][autre]
                 
-                # Vérifier si autre_profil domine profil
-                tous_meilleurs_ou_egaux = all(g >= p for g, p in zip(gains_autre, gains_profil))
-                au_moins_un_meilleur = any(g > p for g, p in zip(gains_autre, gains_profil))
-                
-                if tous_meilleurs_ou_egaux and au_moins_un_meilleur:
-                    pareto_optimal = False
+                # Vérifier si 'autre' domine 'profil'
+                if (autre_j1 >= gain_j1 and autre_j2 >= gain_j2 and 
+                    (autre_j1 > gain_j1 or autre_j2 > gain_j2)):
+                    est_pareto = False
                     break
             
-            if pareto_optimal:
+            if est_pareto:
                 pareto_optima.append(profil)
-                
+        
         return pareto_optima
     
     def niveau_securite(self, id_joueur: int) -> Tuple[float, int]:
         """
-        Calcule le niveau de sécurité pour un joueur
-        Retourne (valeur, indice_strategie)
+        Niveau de sécurité (corrigé)
         """
-        gains = self.jeu.gains[id_joueur]
-        max_min = -np.inf
-        meilleure_strat = -1
+        if id_joueur == 1:
+            gains = self.jeu.gains[1]
+            min_gains = np.min(gains, axis=1)  # Minimum par ligne (stratégie J1)
+        else:
+            gains = self.jeu.gains[2]
+            min_gains = np.min(gains, axis=0)  # Minimum par colonne (stratégie J2)
         
-        for i in range(gains.shape[0]):
-            min_gain = np.min(gains[i])
-            if min_gain > max_min:
-                max_min = min_gain
-                meilleure_strat = i
-                
+        max_min = np.max(min_gains)
+        meilleure_strat = np.argmax(min_gains)
+        
         return (max_min, meilleure_strat)

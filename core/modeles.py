@@ -24,16 +24,27 @@ class Jeu:
         # Vérifier la cohérence des dimensions
         self._valider_matrice_gains()
         
-    def _valider_matrice_gains(self):
-        """Vérifie que les matrices de gains ont des dimensions compatibles"""
-        shapes = []
-        for j in self.joueurs:
-            shapes.append(self.gains[j.id].shape[0])
-        
-        for j in self.joueurs:
-            mat = self.gains[j.id]
-            if mat.shape != tuple(shapes):
-                raise ValueError(f"Dimensions incohérentes pour le joueur {j.id}")
+def _valider_matrice_gains(self):
+    """Vérifie que les matrices de gains ont des dimensions compatibles
+    avec le nombre de stratégies de chaque joueur"""
+    # Vérifier que chaque matrice a le bon nombre de dimensions
+    for j in self.joueurs:
+        mat = self.gains[j.id]
+        if len(mat.shape) != len(self.joueurs):
+            raise ValueError(f"La matrice du joueur {j.id} doit avoir {len(self.joueurs)} dimensions")
+    
+    # Vérifier que les dimensions correspondent aux nombres de stratégies
+    expected_shape = []
+    for j in self.joueurs:
+        expected_shape.append(len(j.strategies))
+    
+    for j in self.joueurs:
+        mat = self.gains[j.id]
+        if mat.shape != tuple(expected_shape):
+            raise ValueError(
+                f"Dimensions incohérentes pour le joueur {j.id}. "
+                f"Attendu: {expected_shape}, Reçu: {mat.shape}"
+            )
 
     def get_strategie_name(self, id_joueur: int, index_strategie: int) -> str:
         """Retourne le nom d'une stratégie à partir de son index"""

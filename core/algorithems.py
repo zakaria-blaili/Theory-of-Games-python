@@ -6,44 +6,49 @@ class AnalyseurJeu:
     def __init__(self, jeu: Jeu):
         self.jeu = jeu
         
-    def strategies_dominantes(self, id_joueur: int, faiblement=False) -> List[int]:
+    def strategies_dominantes(self, id_joueur: int) -> Dict[str, List[int]]:
         """
-        Identifie les stratégies dominantes pour un joueur donné.
-        Compatible avec des nombres de stratégies différents par joueur.
+        Returns dominant strategies categorized properly.
+        Returns: {
+            'strict': [indices of strictly dominant strategies],
+            'weak': [indices of weakly (but not strictly) dominant strategies]
+        }
         """
         gains = self.jeu.gains[id_joueur]
         n_strategies = len(self.jeu.joueurs[id_joueur-1].strategies)
-        dominantes = []
-        
+        result = {'strict': set(), 'weak': set()}
+
+        # Compare all strategy pairs
         for strat in range(n_strategies):
-            est_dominante = True
-            strictement = False
+            strictly_dominates_any = False
+            weakly_dominates_any = False
             
-            for autre in range(n_strategies):
-                if strat == autre:
+            for other in range(n_strategies):
+                if strat == other:
                     continue
-                
-                if id_joueur == 1:
-                    comp = gains[strat, :] >= gains[autre, :]
-                    comp_strict = gains[strat, :] > gains[autre, :]
-                else:
-                    comp = gains[:, strat] >= gains[:, autre]
-                    comp_strict = gains[:, strat] > gains[:, autre]
-                
-                if not np.all(comp):
-                    est_dominante = False
-                    break
                     
-                if np.all(comp_strict):
-                    strictement = True
+                if id_joueur == 1:
+                    diff = gains[strat, :] - gains[other, :]
+                else:
+                    diff = gains[:, strat] - gains[:, other]
+                
+                # Check strict dominance
+                if np.all(diff > 0):
+                    strictly_dominates_any = True
+                    break  # No need to check others if strictly dominates one
+                    
+                # Check weak dominance if not already found strict
+                if np.all(diff >= 0) and np.any(diff > 0):
+                    weakly_dominates_any = True
             
-            if est_dominante:
-                if not faiblement and strictement:
-                    dominantes.append(strat)
-                elif faiblement:
-                    dominantes.append(strat)
+            # Categorize the strategy
+            if strictly_dominates_any:
+                result['strict'].add(strat)
+            elif weakly_dominates_any:
+                result['weak'].add(strat)
         
-        return dominantes
+        # Convert sets to sorted lists
+        return {k: sorted(v) for k, v in result.items()}
     
     def elimination_strategies_dominantes(self, strict=True) -> List[Tuple[int]]:
         """

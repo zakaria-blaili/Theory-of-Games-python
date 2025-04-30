@@ -166,21 +166,18 @@ try:
             with st.expander("Stratégies Dominantes", expanded=True):
                 for j in jeu.joueurs:
                     st.write(f"**Joueur {j.id}**:")
+                    dom = analyseur.strategies_dominantes(j.id)
                     
-                    # Strictement dominantes
-                    dom_strict = analyseur.strategies_dominantes(j.id, faiblement=False)
-                    if dom_strict:
+                    if dom['strict']:
                         st.write("- Strictement dominantes:")
-                        for s in dom_strict:
+                        for s in dom['strict']:
                             st.write(f"  - {jeu.get_strategie_name(j.id, s)}")
                     else:
                         st.write("- Pas de stratégie strictement dominante")
                     
-                    # Faiblement dominantes
-                    dom_faible = analyseur.strategies_dominantes(j.id, faiblement=True)
-                    if dom_faible:
+                    if dom['weak']:
                         st.write("- Faiblement dominantes:")
-                        for s in dom_faible:
+                        for s in dom['weak']:
                             st.write(f"  - {jeu.get_strategie_name(j.id, s)}")
                     else:
                         st.write("- Pas de stratégie faiblement dominante")

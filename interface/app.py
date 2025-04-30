@@ -1,11 +1,25 @@
 import streamlit as st
-import numpy as np
-from modeles import Jeu, Joueur
-from algorithmes import AnalyseurJeu # type: ignore
-from utils import charger_jeu_classique, normaliser_gains
+import sys
+from pathlib import Path
 
-st.set_page_config(page_title="Analyse des Jeux Stratégiques", layout="wide")
+# Set absolute path to project root
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent
+sys.path.insert(0, str(project_root))
 
+# Debug output
+st.write(f"Looking for modules in: {project_root}/core")
+st.write(f"Files in core: {[f.name for f in (project_root/'core').iterdir() if f.is_file()]}")
+
+try:
+    from core.modeles import Jeu, Joueur
+    from core.algorithems import AnalyseurJeu
+    from core.utils import charger_jeu_classique, normaliser_gains
+    st.success("All imports successful!")
+except ImportError as e:
+    st.error(f"Import error details: {repr(e)}")
+    raise
+# Rest of your app code...
 # Configuration de la page
 st.title("📊 Analyse des Jeux Stratégiques")
 st.markdown("""

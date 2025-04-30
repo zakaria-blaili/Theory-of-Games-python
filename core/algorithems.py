@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Dict, Tuple, Optional
-from modeles import Jeu
+from .modeles import Jeu
 
 class AnalyseurJeu:
     def __init__(self, jeu: Jeu):

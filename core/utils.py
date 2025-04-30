@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Dict, List
+from core.modeles import Jeu, Joueur 
 
 def creer_jeu_depuis_matrices(gains_joueurs: Dict[int, np.ndarray], noms_strategies: Dict[int, List[str]]) -> Jeu:
     """

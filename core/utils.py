@@ -18,12 +18,12 @@ def charger_jeu_classique(nom_jeu: str) -> Jeu:
     jeux = {
         "dilemme_prisonnier": {
             "strategies": {
-                1: ["Cooperer", "Trahir"],
-                2: ["Cooperer", "Trahir"]
+                1: ["Avoue", "N’avoue pas"],
+                2: ["Avoue", "N’avoue pas"]
             },
             "gains": {
-                1: np.array([[3, 0], [5, 1]]),
-                2: np.array([[3, 5], [0, 1]])
+                1: np.array([[-5, 0], [-10, -1]]),  # Peines du joueur 1
+                2: np.array([[-5, -10], [0, -1]])    # Peines du joueur 2
             }
         },
         "bataille_sexes": {

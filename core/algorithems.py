@@ -23,36 +23,45 @@ class AnalyseurJeu:
         gains = self.jeu.gains[id_joueur]
         n_strategies = len(self.jeu.joueurs[player_idx].strategies)
         dominantes = []
-
+    
         for strat in range(n_strategies):
-            is_dominant = True
+            dominates_all_others = True
+            
             for other in range(n_strategies):
                 if strat == other:
                     continue
-
-                # Compare all possible combinations of other players' strategies
+                    
+                # Vérifie si 'strat' domine 'other'
+                dominates_current = True
                 others = [list(range(len(j.strategies))) for j in self.jeu.joueurs if j.id != id_joueur]
+                
                 for combi in product(*others):
-                    # Get payoffs for current strategy and alternative strategy
                     if id_joueur == 1:
                         strat_payoff = gains[(strat,) + combi]
                         other_payoff = gains[(other,) + combi]
                     else:
                         strat_payoff = gains[combi + (strat,)]
                         other_payoff = gains[combi + (other,)]
-
-                    # Check dominance condition
-                    if (not faiblement and strat_payoff < other_payoff) or \
-                    (faiblement and strat_payoff <= other_payoff):
-                        is_dominant = False
-                        break
+    
+                    # Condition de domination
+                    if not faiblement:
+                        # Domination stricte: strat doit être strictement meilleure partout
+                        if strat_payoff <= other_payoff:
+                            dominates_current = False
+                            break
+                    else:
+                        # Domination faible: strat doit être au moins égale partout et strictement meilleure quelque part
+                        if strat_payoff < other_payoff:
+                            dominates_current = False
+                            break
                 
-                if not is_dominant:
+                if not dominates_current:
+                    dominates_all_others = False
                     break
-
-            if is_dominant:
+                    
+            if dominates_all_others:
                 dominantes.append(strat)
-
+    
         return dominantes
 
 

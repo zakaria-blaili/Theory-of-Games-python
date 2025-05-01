@@ -50,6 +50,7 @@ class AnalyseurJeu:
 
         return dominantes
 
+
     
     def est_strictement_dominee(self, id_joueur: int, strat: int, strategies_actives: Dict[int, List[int]]) -> bool:
         """

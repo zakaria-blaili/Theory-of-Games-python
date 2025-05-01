@@ -164,7 +164,7 @@ def display_iesds_results(analyseur, jeu):
             st.error(f"Erreur dans l'analyse IESDS: {str(e)}")
 
 # Configuration de la page
-st.set_page_config(page_title="Analyse des Jeux Stratégiques", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Analyse des Jeux Stratégiques", page_icon="🎮", layout="wide")
 st.title("📊 Analyse des Jeux Stratégiques")
 st.markdown("""
 Cette application permet d'analyser les jeux stratégiques en utilisant différents concepts de théorie des jeux.
@@ -276,7 +276,16 @@ try:
             - **Niveau de sécurité**: Gain maximum qu'un joueur peut garantir quel que soit le comportement des autres
             - **IESDS**: Élimination successive des stratégies strictement dominées
             """)
-    
+
+
+        st.markdown("""
+        ---
+        <small style='text-align: center; display: block;'>
+        Made with <span style='color: red'>❤️</span> using Streamlit | © 2025 Zakaria And Asma
+        </small>
+        """, unsafe_allow_html=True)
+
+
 except Exception as e:
     st.error(f"Une erreur est survenue: {str(e)}")
     st.error("Veuillez vérifier que tous les modules nécessaires sont correctement installés.")

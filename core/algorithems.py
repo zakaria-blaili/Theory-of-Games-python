@@ -25,28 +25,33 @@ class AnalyseurJeu:
         dominantes = []
 
         for strat in range(n_strategies):
-            is_dominated = False
+            is_dominant = True
             for other in range(n_strategies):
                 if strat == other:
                     continue
 
-                # Build mask for all other players’ strategies
+                # Compare all possible combinations of other players' strategies
                 others = [list(range(len(j.strategies))) for j in self.jeu.joueurs if j.id != id_joueur]
                 for combi in product(*others):
+                    # Get payoffs for current strategy and alternative strategy
                     if id_joueur == 1:
                         strat_payoff = gains[(strat,) + combi]
                         other_payoff = gains[(other,) + combi]
                     else:
-                        strat_payoff = gains[combi[:id_joueur-1] + (strat,) + combi[id_joueur-1:]]
-                        other_payoff = gains[combi[:id_joueur-1] + (other,) + combi[id_joueur-1:]]
+                        strat_payoff = gains[combi + (strat,)]
+                        other_payoff = gains[combi + (other,)]
 
-                    if not faiblement and strat_payoff >= other_payoff:
+                    # Check dominance condition
+                    if (not faiblement and strat_payoff < other_payoff) or \
+                    (faiblement and strat_payoff <= other_payoff):
+                        is_dominant = False
                         break
-                    if faiblement and strat_payoff > other_payoff:
-                        break
-                else:
-                    # All comparisons passed (domination)
-                    dominantes.append(strat)
+                
+                if not is_dominant:
+                    break
+
+            if is_dominant:
+                dominantes.append(strat)
 
         return dominantes
 
@@ -58,23 +63,28 @@ class AnalyseurJeu:
         """
         gains = self.jeu.gains[id_joueur]
         player_idx = id_joueur - 1
+        n_strategies = len(self.jeu.joueurs[player_idx].strategies)
         
         for other in strategies_actives[id_joueur]:
             if other == strat:
                 continue
                 
-            if id_joueur == 1:
-                # For player 1, compare rows
-                opponent_id = 2
-                mask = [i in strategies_actives[opponent_id] for i in range(gains.shape[1])]
-                diff = gains[strat, :][mask] - gains[other, :][mask]
-            else:
-                # For player 2, compare columns
-                opponent_id = 1
-                mask = [i in strategies_actives[opponent_id] for i in range(gains.shape[0])]
-                diff = gains[:, strat][mask] - gains[:, other][mask]
+            is_dominated = True
+            others = [strategies_actives[j.id] for j in self.jeu.joueurs if j.id != id_joueur]
             
-            if np.all(diff < 0):
+            for combi in product(*others):
+                if id_joueur == 1:
+                    strat_payoff = gains[(strat,) + combi]
+                    other_payoff = gains[(other,) + combi]
+                else:
+                    strat_payoff = gains[combi + (strat,)]
+                    other_payoff = gains[combi + (other,)]
+                
+                if strat_payoff >= other_payoff:
+                    is_dominated = False
+                    break
+                    
+            if is_dominated:
                 return True
                 
         return False
